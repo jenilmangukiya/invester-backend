@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import mongooseAggregatePaginate from "mongoose-aggregate-paginate-v2";
 
 const investerSchema = new mongoose.Schema({
   name: {
@@ -15,5 +16,7 @@ const investerSchema = new mongoose.Schema({
     index: true,
   },
 });
+
+investerSchema.plugin(mongooseAggregatePaginate);
 
 export const Invester = mongoose.model("Invester", investerSchema);

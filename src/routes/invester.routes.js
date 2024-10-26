@@ -1,6 +1,7 @@
 import { Router } from "express";
 import {
   addInvesterPdfContent,
+  deleteInvester,
   getAllInvester,
   matchInvester,
 } from "../controllers/invester.controller.js";
@@ -14,6 +15,8 @@ router.route("/").get(getAllInvester);
 router.route("/extractFileText").post(upload.single("file"), extractFileText);
 
 router.route("/addInvesterPdfContent").post(addInvesterPdfContent);
+
+router.route("/:investerId").delete(deleteInvester);
 
 router.route("/matchInvester").post(matchInvester);
 

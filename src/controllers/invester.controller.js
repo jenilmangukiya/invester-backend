@@ -4,10 +4,56 @@ import PDFParser from "pdf2json";
 import { PdfReader } from "pdfreader";
 import { ApiError } from "../utils/ApiError.js";
 import { Invester } from "../models/invester.model.js";
+import { ObjectId } from "mongodb";
+
 import fs from "fs";
+import mongoose from "mongoose";
 
 const getAllInvester = asyncHandler(async (req, res) => {
-  res.status(200).json(new ApiResponse(200));
+  const { page = 1, limit = 10, query, sortBy, sortType } = req.query;
+
+  const aggregation = [];
+
+  if (query) {
+    const matchConditions = [
+      { content: { $regex: new RegExp(query, "i") } },
+      { name: { $regex: new RegExp(query, "i") } },
+    ];
+
+    // Check if the query is a valid ObjectId
+    if (mongoose.Types.ObjectId.isValid(query)) {
+      matchConditions.push({ _id: new ObjectId(query) });
+    }
+
+    aggregation.push({
+      $match: {
+        $or: matchConditions,
+      },
+    });
+  }
+
+  if (sortBy && ["name", "content", "createdAt"].includes(sortBy)) {
+    const sortOrder = sortType.toLowerCase() === "desc" ? -1 : 1;
+    aggregation.push({
+      $sort: {
+        [sortBy]: sortOrder,
+      },
+    });
+  }
+
+  const options = {
+    page: +page,
+    limit: +limit,
+  };
+
+  const pipeline = Invester.aggregate(aggregation);
+
+  const investersPaginated = await Invester.aggregatePaginate(
+    pipeline,
+    options
+  );
+
+  res.status(200).json(new ApiResponse(200, investersPaginated));
 });
 
 const extractFileText1 = asyncHandler((req, res) => {
@@ -128,9 +174,28 @@ const matchInvester = asyncHandler(async (req, res) => {
   res.json({ success: true, investors: response });
 });
 
+const deleteInvester = asyncHandler(async (req, res) => {
+  const { investerId } = req.params;
+
+  // check if the Comment Id is in correct format
+  if (!mongoose.Types.ObjectId.isValid(investerId))
+    throw new ApiError(404, "Invalid Comment");
+
+  const comment = await Invester.findByIdAndDelete(investerId);
+
+  if (!comment) {
+    throw new ApiError("Failed to delete Invester!, Please try again");
+  }
+
+  res
+    .status(200)
+    .json(new ApiResponse(200, null, "Invester deleted successfully"));
+});
+
 export {
   getAllInvester,
   extractFileText,
   addInvesterPdfContent,
   matchInvester,
+  deleteInvester,
 };
