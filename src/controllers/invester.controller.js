@@ -73,14 +73,15 @@ const extractFileText = asyncHandler(async (req, res) => {
 });
 
 const addInvesterPdfContent = asyncHandler(async (req, res) => {
-  const { content } = req.body;
+  const { content, name } = req.body;
 
   if (!content) {
-    throw new ApiError(401, "Content is required");
+    throw new ApiError(400, "Content is required");
   }
 
   const invester = await Invester.create({
-    content: content,
+    content,
+    name,
   });
 
   res.status(201).json(new ApiResponse(201, invester));
