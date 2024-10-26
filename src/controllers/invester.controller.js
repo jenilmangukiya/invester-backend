@@ -1,12 +1,10 @@
-import path from "path";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
-import fs from "fs";
 import PDFParser from "pdf2json";
-import { fileURLToPath } from "url";
 import { PdfReader } from "pdfreader";
 import { ApiError } from "../utils/ApiError.js";
 import { Invester } from "../models/invester.model.js";
+import fs from "fs";
 
 const getAllInvester = asyncHandler(async (req, res) => {
   res.status(200).json(new ApiResponse(200));
@@ -21,9 +19,8 @@ const extractFileText1 = asyncHandler((req, res) => {
   pdfParser.on("readable", (meta) => console.log("PDF Metadata", meta));
   pdfParser.on("pdfParser_dataReady", (pdfData) => {
     let textContent = "";
-    // console.log("pdfData", pdfData);
+
     pdfData.Pages.forEach((page) => {
-      console.log("page", page);
       page.Texts.forEach((text) => {
         text.R.forEach((textRun) => {
           textContent += decodeURIComponent(textRun.T);
@@ -32,8 +29,6 @@ const extractFileText1 = asyncHandler((req, res) => {
       });
       textContent += "\n"; // Newline between pages
     });
-
-    console.log("pdfParser.getRawTextContent()", textContent);
   });
 
   pdfParser.on("error", (err) => console.error("Parser Error", err));
@@ -57,7 +52,6 @@ function parsePdf(file) {
         return resolve(textContent);
       }
       if (item.text) {
-        console.log("item.text", item.text);
         textContent += item.text;
       }
     });
@@ -66,10 +60,10 @@ function parsePdf(file) {
 
 const extractFileText = asyncHandler(async (req, res) => {
   const file = req.file;
-  console.log("file", file);
 
   try {
     const textContent = await parsePdf(req.file); // Assuming req.file contains the file data
+    fs.unlinkSync(req.file.path);
     res.status(200).json(new ApiResponse(200, textContent));
   } catch (error) {
     res
@@ -92,4 +86,50 @@ const addInvesterPdfContent = asyncHandler(async (req, res) => {
   res.status(201).json(new ApiResponse(201, invester));
 });
 
-export { getAllInvester, extractFileText, addInvesterPdfContent };
+const matchInvester = asyncHandler(async (req, res) => {
+  const { location, size, money, industry } = req.body;
+
+  // Initialize an empty array for query conditions
+  const conditions = [];
+
+  // Check and add conditions based on the presence of parameters
+  if (location) {
+    conditions.push({ content: new RegExp(location, "i") });
+  }
+  if (size) {
+    conditions.push({ content: new RegExp(size, "i") });
+  }
+  if (money) {
+    conditions.push({ content: new RegExp(`\\b${money}\\b`, "i") });
+  }
+  if (industry) {
+    conditions.push({ content: new RegExp(industry, "i") });
+  }
+
+  // Check if there are any conditions to apply
+  if (conditions.length === 0) {
+    return res.json({
+      success: false,
+      message: "No search criteria provided.",
+    });
+  }
+
+  // Construct the query using the conditions
+  const query = { $and: conditions };
+
+  const investors = await Invester.find(query);
+
+  // Structure the response
+  const response = investors.map((investor) => ({
+    content: investor.content,
+  }));
+
+  res.json({ success: true, investors: response });
+});
+
+export {
+  getAllInvester,
+  extractFileText,
+  addInvesterPdfContent,
+  matchInvester,
+};
